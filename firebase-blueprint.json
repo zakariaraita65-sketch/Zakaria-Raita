@@ -1,0 +1,76 @@
+{
+  "entities": {
+    "UserStats": {
+      "title": "User Stats",
+      "description": "The hunter's core progression data.",
+      "type": "object",
+      "properties": {
+        "rank": { "type": "string", "enum": ["E", "D", "C", "B", "A", "S", "SS", "SSS"] },
+        "level": { "type": "integer" },
+        "exp": { "type": "integer" },
+        "maxExp": { "type": "integer" },
+        "gold": { "type": "integer" },
+        "streak": { "type": "integer" },
+        "lastActive": { "type": "string", "format": "date-time" },
+        "totalFocusTime": { "type": "integer" },
+        "completedQuests": { "type": "integer" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "gender": { "type": "string", "enum": ["male", "female"] },
+        "age": { "type": "integer" },
+        "penaltyActive": { "type": "boolean" },
+        "penaltyReason": { "type": "string" },
+        "penaltyDeadline": { "type": "string", "format": "date-time" },
+        "activeTitle": { "type": "string" },
+        "titles": { "type": "array", "items": { "type": "string" } },
+        "pardonTickets": { "type": "integer" },
+        "pardonGifted": { "type": "boolean" },
+        "height": { "type": "number" },
+        "weight": { "type": "number" },
+        "bloodType": { "type": "string" },
+        "ultimateGoal": { "type": "string" }
+      },
+      "required": ["rank", "level", "exp", "maxExp", "gold", "streak", "lastActive", "pardonTickets"]
+    },
+    "Quest": {
+      "title": "Quest",
+      "description": "A study mission or academic goal.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "expReward": { "type": "integer" },
+        "type": { "type": "string", "enum": ["daily", "main"] },
+        "completed": { "type": "boolean" },
+        "dueDate": { "type": "string", "format": "date-time" },
+        "category": { "type": "string" }
+      },
+      "required": ["userId", "title", "expReward", "type", "completed", "category"]
+    },
+    "Skill": {
+        "title": "Skill",
+        "description": "Progress in a specific subject.",
+        "type": "object",
+        "properties": {
+            "level": { "type": "integer" },
+            "exp": { "type": "integer" },
+            "maxExp": { "type": "integer" }
+        }
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserStats",
+      "description": "Core profile for each hunter."
+    },
+    "/users/{userId}/skills/{skillId}": {
+      "schema": "Skill",
+      "description": "Subject proficiency levels."
+    },
+    "/users/{userId}/quests/{questId}": {
+      "schema": "Quest",
+      "description": "Individual quests for each hunter."
+    }
+  }
+}

@@ -1,0 +1,125 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- HELPERS ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isEmailVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isVerified() {
+      return isSignedIn() && (request.auth.token.email_verified == true || request.auth.token.firebase.sign_in_provider == 'anonymous');
+    }
+
+    function isOwner(userId) {
+      return isVerified() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // --- VALIDATION HELPERS ---
+    
+    function isValidUserStats(data) {
+      return data.keys().hasAll(['rank', 'level', 'exp', 'maxExp', 'gold', 'streak', 'lastActive'])
+        && data.rank is string
+        && data.level is number
+        && data.exp is number
+        && data.maxExp is number
+        && data.gold is number
+        && data.streak is number
+        && data.lastActive is string
+        && (!('pardonTickets' in data) || data.pardonTickets is number)
+        && (!('gender' in data) || data.gender in ['male', 'female'])
+        && (!('age' in data) || data.age is number)
+        && (!('height' in data) || data.height is number)
+        && (!('weight' in data) || data.weight is number)
+        && (!('bloodType' in data) || data.bloodType is string)
+        && (!('ultimateGoal' in data) || data.ultimateGoal is string)
+        && (!('displayName' in data) || data.displayName is string)
+        && (!('photoURL' in data) || data.photoURL is string)
+        && (!('penaltyActive' in data) || data.penaltyActive is bool)
+        && (!('penaltyReason' in data) || data.penaltyReason == null || data.penaltyReason is string)
+        && (!('penaltyAssignedAt' in data) || data.penaltyAssignedAt == null || data.penaltyAssignedAt is string)
+        && (!('penaltyDeadline' in data) || data.penaltyDeadline == null || data.penaltyDeadline is string)
+        && (!('activeTitle' in data) || data.activeTitle is string)
+        && (!('titles' in data) || data.titles is list)
+        && (!('pardonGifted' in data) || data.pardonGifted is bool)
+        && (!('totalFocusTime' in data) || data.totalFocusTime is number)
+        && (!('completedQuests' in data) || data.completedQuests is number);
+    }
+
+    function isValidQuest(data, userId) {
+      return data.userId == userId
+        && data.keys().hasAll(['userId', 'title', 'expReward', 'type', 'completed', 'category', 'dueDate'])
+        && data.title is string && data.title.size() <= 500
+        && data.expReward is number
+        && (data.type == 'daily' || data.type == 'main')
+        && data.completed is bool
+        && data.dueDate is string
+        && data.category is string
+        && (!('description' in data) || data.description is string)
+        && (!('duration' in data) || data.duration is number)
+        && (!('status' in data) || data.status in ['pending', 'active', 'completed', 'failed'])
+        && (!('startedAt' in data) || data.startedAt is string);
+    }
+
+    function isValidSkill(data) {
+      return data.keys().hasAll(['level', 'exp', 'maxExp'])
+        && data.level is number
+        && data.exp is number
+        && data.maxExp is number;
+    }
+
+    // --- MATCH BLOCKS ---
+
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUserStats(incoming());
+      allow update: if isOwner(userId) && isValidUserStats(incoming()) && (
+        // Action-based updates
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'rank', 'level', 'exp', 'maxExp', 'gold', 'streak', 'lastActive', 
+          'totalFocusTime', 'completedQuests', 'displayName', 'photoURL',
+          'penaltyActive', 'penaltyReason', 'penaltyDeadline', 'penaltyAssignedAt',
+          'activeTitle', 'titles', 'pardonTickets', 'pardonGifted',
+          'height', 'weight', 'bloodType', 'ultimateGoal', 'gender', 'age'
+        ])
+      );
+
+      match /quests/{questId} {
+        allow list: if isOwner(userId) && resource.data.userId == request.auth.uid;
+        allow get: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidQuest(incoming(), userId) && isValidId(questId);
+        allow update: if isOwner(userId) && isValidQuest(incoming(), userId) && (
+          // Update can be either completing, or editing title
+          incoming().diff(existing()).affectedKeys().hasAny(['completed', 'title', 'category', 'status', 'startedAt'])
+        );
+        allow delete: if isOwner(userId);
+      }
+
+      match /skills/{skillId} {
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId);
+        allow write: if isOwner(userId) && isValidSkill(incoming()) && isValidId(skillId);
+      }
+    }
+  }
+}
